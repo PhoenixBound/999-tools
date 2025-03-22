@@ -1,0 +1,11 @@
+# Various game data files
+*.bak
+*.bmp
+*.dat
+*.dec
+*.gfx
+*.json
+*.png
+
+# Python virtual environment
+.venv
