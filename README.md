@@ -53,7 +53,7 @@ Setup instructions (they're the same as for bg_files.py):
 * `py -m pip install --upgrade pip` to make sure pip is working and up to date
 * `pip install pillow`
 
-Command line usage instructions:
+Command line usage instructions (after activating the venv (if any) and installing the image library):
 
 * To convert to an easily editable format: `py font.py dump <kanji.dat> <output.png> <output.json>`
 * To convert back into the game format: `py font.py make <edited.png> <edited.json> <new-kanji.dat>`
