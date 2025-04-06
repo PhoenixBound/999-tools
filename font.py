@@ -1,7 +1,7 @@
-# BG.dat image extraction/insertion script
+# Script to convert back and forth between etc/kanji*.dat and PNG+JSON files
 # for 999: Nine Hours, Nine Persons, Nine Doors (DS)
 # by PhoenixBound
-# Last updated: 2025-03-21
+# Last updated: 2025-04-06
 
 from io import StringIO
 import itertools
@@ -49,10 +49,14 @@ def read_char(kanji_dat, offset):
     if code[1] != 0:
         code.reverse()
     else:
-        # print('Before:', code)
         code.pop()
-        # print('After:', code)
-    code = code.decode('mskanji')
+
+    code_bytes = None
+    try:
+        code = code.decode('mskanji')
+    except UnicodeError:
+        code_bytes = bytes(code)
+        code = None
 
     unk2 = as_signed_byte(kanji_dat[offset + 2])
     unk3 = as_signed_byte(kanji_dat[offset + 3])
@@ -62,8 +66,7 @@ def read_char(kanji_dat, offset):
     unk7 = kanji_dat[offset + 7]
     gfx = kanji_dat[offset+8:offset+8+unk5*2]
 
-    return {\
-        'code': code,          \
+    result = {\
         'left_offset': unk2,   \
         'top_offset': unk3,    \
         'unk4': unk4,          \
@@ -72,6 +75,11 @@ def read_char(kanji_dat, offset):
         'unk7': unk7,          \
         'gfx': gfx             \
     }
+    if code is not None:
+        result['code'] = code
+    else:
+        result['code_bytes'] = code_bytes
+    return result
 
 def cheaply_visualize_char(raw_gfx):
     rows = []
@@ -181,13 +189,12 @@ def make_sir0_from_dict(structured):
     for char in structured['chars']:
         main_data.extend((len(character_data) // 2).to_bytes(2, 'little'))
 
-        # TODO: read a different field that can contain arbitrary bytes, to
-        # allow for Frankenstein encodings like the pt-br fan translation
-        code = bytearray(char['code'].encode('mskanji'))
+        code = bytearray(char['code_bytes'])
         if len(code) == 1:
             code.append(0)
         else:
             code.reverse()
+
         character_data.extend(code)
         del code
 
@@ -259,7 +266,7 @@ def print_usage(args):
     print(f'    python {args[0]} make <edited.png> <edited.json> <new-kanji.dat>')
 
 def main(args):
-    if args[1] == 'dump':
+    if len(args) >= 2 and args[1] == 'dump':
         if len(args) != 5:
             print_usage(args)
             return 1
@@ -273,14 +280,17 @@ def main(args):
         img = build_image(structured, 32)
         img.save(args[3], format='PNG')
 
-        # Remove the actual image data before outputting to JSON
+        # Remove the actual image data before outputting to JSON, and convert
+        # code_bytes fields to a string
         for (i, char) in enumerate(structured['chars']):
             del char['gfx']
             char['gfx_pos'] = i
+            if 'code_bytes' in char:
+                char['code_bytes'] = char['code_bytes'].hex()
 
         with open(args[4], 'w', encoding='utf-8', newline='\n') as f:
             json.dump(structured, f, ensure_ascii=False, indent=4)
-    elif args[1] == 'make':
+    elif len(args) >= 2 and args[1] == 'make':
         if len(args) != 5:
             print_usage(args)
             return 1
@@ -292,29 +302,68 @@ def main(args):
         with open(args[3], 'r', encoding='utf-8') as f:
             structured = json.load(f)
 
+        chars_list = structured['chars']
+
         # Add the image data to every character
-        for char in structured['chars']:
+        for char in chars_list:
             gfx_pos = char.pop('gfx_pos')
             canvas_height = char['canvas_height']
             char['gfx'] = gfx_list[gfx_pos][0:canvas_height*2]
 
         del gfx_list
 
+        # Convert all SJIS codes to use the code_bytes field, and convert it into a bytes object
+        for (i, char) in enumerate(chars_list):
+            code = char.get('code')
+            if code is not None:
+                code_bytes = code.encode('mskanji')
+                if 'code_bytes' in char:
+                    if char['code_bytes'] == code_bytes:
+                        print(f"WARNING: redundant 'code_bytes' field in metadata for character {i} in list, with character code '{code}'")
+                    else:
+                        raise ValueError(f"Character {i} has 'code' and 'code_bytes' fields both set, to different values" + \
+                                         f"(code = {code} / {code_bytes}, code_bytes = {char['code_bytes']})." + \
+                                         "Please remove one of the fields.")
+                char['code_bytes'] = code_bytes
+            else:
+                if 'code_bytes' not in char:
+                    raise ValueError(f'No "code" or "code_bytes" field in character (index {i} in chars list)')
+                char['code_bytes'] = bytes.fromhex(char['code_bytes'])
+
         # Sort characters by SJIS byte sequence (the game does a binary search)
         def sjis_key(c):
-            code = c['code'].encode('mskanji')
+            code = c['code_bytes']
             if len(code) == 1:
                 return b'\x00' + code
             else:
                 return code
 
-        structured['chars'].sort(key=sjis_key)
+        chars_list.sort(key=sjis_key)
+
+        # Ensure there are no duplicates
+        for i in range(len(chars_list) - 1):
+            if chars_list[i]['code_bytes'] == chars_list[i + 1]['code_bytes']:
+                # Display a nice error message
+                char1_code = chars_list[i].get('code')
+                if char1_code is None:
+                    char1_code = f"code_bytes = {chars_list[i]['code_bytes']}"
+                else:
+                    char1_code = f"code = '{char1_code}'"
+                char2_code = chars_list[i + 1].get('code')
+                if char2_code is None:
+                    char2_code = f"code_bytes = {chars_list[i + 1]['code_bytes']}"
+                else:
+                    char2_code = f"code = '{char2_code}'"
+                raise ValueError(f'Duplicate character codes in list of characters! For one character, {char1_code}, but for another character, {char2_code}, which matches the first')
 
         kanji_dat = make_sir0_from_dict(structured)
 
         with open(args[4], 'wb') as f:
             f.write(kanji_dat)
     else:
+        if len(args) == 1:
+            print_usage(args)
+            return 1
         print(f'Invalid command "{args[1]}" -- expected "dump" or "make"')
         return 1
 
