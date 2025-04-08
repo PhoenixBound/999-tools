@@ -28,7 +28,7 @@ Code usage instructions:
 
 # camera_rooms.py
 
-For editing the "top view"/"bird's-eye view" data in escape rooms, which includes the name of the specific room you're in. The tool converts etc/camera.dat back and forth between .dat and .json
+For editing the "top view"/"bird's-eye view" data in escape rooms, which includes the name of the specific room you're in. The tool converts etc/camera.dat back and forth between .dat and .json.
 
 Command line usage instructions:
 
@@ -41,7 +41,40 @@ Command line usage instructions:
 
 Code usage instructions:
 
-* `dump` takes the bytes of the file and returns a `list` of dicts. * `make_sir0_from_obj_list` takes a list of objects and returns the bytes of the camera.dat file.
+* `dump` takes the bytes of the file and returns a `list` of dicts.
+* `make_sir0_from_obj_list` takes a list of objects and returns the bytes of the camera.dat file.
+
+# chara.py
+
+For editing speaker data in scripts (the names of people when they talk, which sprite on the screen should animate, which sound effect to play for text beeps, etc.). The tool converts etc/chara.dat back and forth between .dat and .json.
+
+Command line usage instructions:
+
+* To convert to an easily translatable format: `py chara.py dump <chara.dat> <output.json>`
+* To convert back into the game format: `py chara.py make <edited.json> <output.dat>`
+
+Code usage instructions:
+
+* `dump` takes the bytes of the file and returns a `list` of dicts.
+* `make_sir0_from_list` takes a list of objects and returns the bytes of the chara.dat file.
+
+This tool only supports normal Shift-JIS-encoded files.
+
+# file.py
+
+For editing the text in the File menu, that is, the menu where you can read documents that are collected over the course of an escape room. The tool converts etc/file.dat back and forth between .dat and .json.
+
+Command line usage instructions:
+
+* To convert to an easily translatable format: `py file.py dump <file.dat> <output.json>`
+* To convert back into the game format: `py chara.py make <edited.json> <output.dat>`
+
+Code usage instructions:
+
+* `dump` takes the bytes of the file and returns a `list` of dicts.
+* `make_sir0_from_list` takes a list of objects and returns the bytes of the file.dat file.
+
+This tool only supports normal Shift-JIS-encoded files.
 
 # font.py
 
@@ -60,13 +93,17 @@ Command line usage instructions (after activating the venv (if any) and installi
 
 Code usage instructions:
 
-* TODO
+* TODO (I still haven't extracted a lot of important stuff out of the `main` function)
 
 The PNG consists of 14x14 squares. (14x14 is the maximum size the game supports; any taller will cause an out-of-bounds memory write, and iirc the game will ignore further pixels to the right.) All characters must be drawn at the **top** of one of these squares. Which square maps to which font character is determined by the `"gfx_pos"` field of the character in the JSON file. This is supposed to make it easier to enlarge the image and insert new characters, without shifting all the other characters out of the way.
 
 The script dumps a greyscale PNG with a bit depth of 1. I'm not aware of any tools that can save greyscale PNGs at all, much less with a specific bit depth, so the tool accepts any PNG as input to the `make` command and converts the image (in a lossy way, if other colors are used) to have a bit depth of 1. I strongly recommend that you only use #000000 and #FFFFFF in your edited images.
 
-No escape mechanism is provided to associate a character with non-Shift-JIS byte sequences at this time. This means that this tool is not compatible with the PT-BR fan translation of 999. If that's a problem, I can add it.
+Every character in the font must have one of two fields identifying which bytes map to which character: `code`, a character that can be encoded in one or two bytes in Shift-JIS; or `code_bytes`, a direct way to input the exact bytes of text that a character should have, even if it doesn't map to any valid Shift-JIS character. For example, a character that has a `code` of `▼` will be the same as a character with `code_bytes` of `81a5`, because the black downward triangle in Shift-JIS is encoded as the bytes 81 A5.
+
+If you want to insert new characters in the English game, I recommend replacing hiragana that have no diacritics. 999 in both English and Japanese converts half-width katakana characters into full-width hiragana in many (all?) contexts where text needs to be displayed, so choosing those specific characters will make your custom characters take up only a single byte most of the time.
+
+A more intuitive font dumper/inserter might offset characters vertically to match their in-game `top_offset`. I opted not to do this because I was lazy and because the letter `Q` in kanji_n.dat would have an extra (blank) row of pixels on a 15th line of the graphics if I tried that. It's not impossible to add, but I won't do it unless someone asks for it.
 
 # room_data.py
 
