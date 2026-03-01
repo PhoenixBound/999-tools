@@ -1,7 +1,7 @@
 # BG.dat image extraction/insertion script
 # for 999: Nine Hours, Nine Persons, Nine Doors (DS)
 # by PhoenixBound
-# Last updated: 2025-03-21
+# Last updated: 2025-05-01
 
 # import json
 import sys
@@ -184,7 +184,14 @@ def upconvert_palette(pal16):
     return pal24
 
 def downconvert_palette(pal24):
-    assert len(pal24) == 768
+    if len(pal24) != 768:
+        assert len(pal24) < 768
+        print(f'WARNING: image palette only contains {len(pal24) / 3} colors (expected 256). The rest will be filled in with black.')
+        padded_palette = bytearray(pal24)
+        for _ in range(len(padded_palette), 768):
+            # Add black to the end of the palette to fill out the rest of the space
+            padded_palette.append(0)
+        pal24 = padded_palette
     pal16 = bytearray()
     for i in range(0, len(pal24), 3):
         # Since we upconverted by repeating the bits, we can losslessly

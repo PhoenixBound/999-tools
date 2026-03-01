@@ -105,6 +105,31 @@ If you want to insert new characters in the English game, I recommend replacing 
 
 A more intuitive font dumper/inserter might offset characters vertically to match their in-game `top_offset`. I opted not to do this because I was lazy and because the letter `Q` in kanji_n.dat would have an extra (blank) row of pixels on a 15th line of the graphics if I tried that. It's not impossible to add, but I won't do it unless someone asks for it.
 
+# item_model.py
+
+For dumping the game's 3D models (`item/*.b3d`). It can convert between .b3d format and .gltf format with binary data and textures as separate files. Conversion in the .gltf --> .b3d direction is not supported.
+
+Setup instructions (they're the same as for bg_files.py):
+
+* This script uses the `pillow` library to read images. Due to the nature of Python, you may want to [create a "venv"](<https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/#create-and-use-virtual-environments>) and run all of the commands out of that: `py -m venv .venv`
+* `py -m pip install --upgrade pip` to make sure pip is working and up to date
+* `pip install pillow`
+
+Command line usage instructions (after activating the venv (if any) and installing the image library):
+
+* To convert to an easily editable format: `py item_model.py <model.b3d> <output-directory>
+
+Code usage instructions:
+
+* `dump` takes the bytes of the file and returns a `dict` with all the parts of the model
+* TODO (making a glTF model without using the `main` function is probably annoying)
+
+glTF and the DS's shading model apparently aren't a good fit for each other. There is no such thing as "ambient color" in physically-based rendering, but materials on the DS do support ambient and diffuse and specular colors. I may have to export the models in a different format like FBX to make round-tripping possible.
+
+999 supports two different versions of the B3D format: v101 and v102. This tool only supports v102.
+
+This model format seems generic enough to be used outside of 999, in other games made by Chunsoft. I wouldn't be surprised if the two lists that seem to be empty in all the models I've checked are related to armature and animation support, or something like that.
+
 # room_data.py
 
 For editing the options in the "Memories of the escape" menu, which lets you replay old escape rooms.
