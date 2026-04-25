@@ -32,11 +32,10 @@ def to_encoded_display_str(s, encoding):
 def at6p_decompress(data):
     assert data[0:4] == b'AT6P'
     unk = data[4]
-    compressed_size = int.from_bytes(data[5:7], 'little')
+    compressed_size = int.from_bytes(data[5:7], 'little') | (data[19] << 16)
     assert compressed_size == len(data)
     # assert int.from_bytes(data[7:16], 'little') == 0
     decompressed_size = int.from_bytes(data[16:19], 'little')
-    assert data[19] == 0
     
     previous = data[20]
     current = previous
@@ -162,7 +161,9 @@ def at6p_compress(data):
         output.append(compressed_byte)
     
     # Fill in the compressed size, now that we know it
-    output[5:7] = len(output).to_bytes(2, 'little')
+    sz = len(output).to_bytes(3, 'little')
+    output[5:7] = sz[0:2]
+    output[19] = sz[2]
     
     # return bytes(output)
     return output
